@@ -9,14 +9,30 @@ import cv2 as cv
 from json import loads
 from imgaug import augmenters as iaa
 
+def get_file_index(dir):
+    files = tuple(map(lambda x: int(x.split(".")[0]), os.listdir("{}".format(dir))))
+    if not len(files):
+        return 0
 
-PATH = "dataset/07"
-OUT_PATH="dataset/train_data"
-END = len(os.listdir("{}".format(PATH))) / 2 - 1#498
-IDX_POS = 3783
-IDX_NEG = 10976
-IDX_PART = 3764
-WIN_SIZE = 12
+    return max(files) + 1
+
+PATH = "dataset/val"
+OUT_PATH="dataset/val_data_rnet"
+END = len(os.listdir("{}/JPEGImages".format(PATH))) - 1#498
+IDX_POS = get_file_index(dir="{}/positive".format(OUT_PATH))
+IDX_NEG = get_file_index(dir="{}/negative".format(OUT_PATH))
+IDX_PART = get_file_index(dir="{}/part".format(OUT_PATH))
+WIN_SIZE = 24
+
+
+"""for filename in os.listdir("{}/negative".format(OUT_PATH)):
+    if not(".jpg" in filename):
+        continue
+
+    img = cv.imread("{}/negative/{}".format(OUT_PATH, filename))
+    if img.shape[:2] != (WIN_SIZE, WIN_SIZE):
+        print("Fuck ", filename, img.shape)
+exit(0)"""
 
 def iou_mask(mask):
     area = mask.shape[0] * mask.shape[1]
@@ -40,8 +56,17 @@ def slice_win(bbox, win_size, offset=(0, 0)):
        h_padding + offset[0] + x - ceil(h_offset): h_padding + offset[0] + x + w + floor(h_offset)
    ]
 
-def crop_win(target, bbox, win_size, offset=(0, 0)):
-    return target[slice_win(bbox=bbox, win_size=win_size, offset=offset)]
+def crop_win(target, bbox, win_size, offset=(0, 0), pad=False):
+    res = target[slice_win(bbox=bbox, win_size=win_size, offset=offset)]
+
+    if res.shape[:2] != (win_size, win_size) and pad:
+        if len(res.shape) > 2 and res.shape[2] > 1:
+            res = np.pad(res, ((0, win_size - res.shape[0]), (0, win_size - res.shape[1]), (0, 0)), "edge")
+        else:
+            res = np.pad(res, ((0, win_size - res.shape[0]), (0, win_size - res.shape[1])), "edge")
+        #res = np.pad(res, ((0, 0), (0, 0)), "edge")
+
+    return res
 
 def save_crop_with_gt(crop, crop_mask, idx, path):
     p_img = Image.fromarray(crop)
@@ -60,10 +85,10 @@ def save_crop_with_gt(crop, crop_mask, idx, path):
             f.write(content)
 
 #for i in range(END + 1):
-for i, filename in enumerate(os.listdir("{}".format(PATH))[::2]):
+for i, filename in enumerate(os.listdir("{}/JPEGImages".format(PATH))):
     print("Start {}".format(filename))
     #img = cv.imread("{}/{:06}.jpg".format(PATH, i))
-    img = cv.imread("{}/{}".format(PATH, filename))
+    img = cv.imread("{}/JPEGImages/{}".format(PATH, filename))
 
     # load bbox corner points
     """with open("{}/{:06}.txt".format(PATH, i), "r+") as f:
@@ -73,7 +98,8 @@ for i, filename in enumerate(os.listdir("{}".format(PATH))[::2]):
     mask = np.zeros(img.shape[:2], dtype=np.uint8)
     cv.fillConvexPoly(mask, points=points, color=255)"""
 
-    mask = cv.imread("{}/{}".format(PATH, filename.replace(".jpg", ".png")), cv.IMREAD_GRAYSCALE)
+    mask = cv.imread("{}/SegmentationClass/{}".format(PATH, filename.replace(".jpg", ".png")))
+    mask = mask[..., 2]
     #mask[mask < 250] = 0
     points = cv.findNonZero(mask)
 
@@ -89,23 +115,13 @@ for i, filename in enumerate(os.listdir("{}".format(PATH))[::2]):
     p_img = p_img.resize(scaled_size, Image.ANTIALIAS)
     p_mask = p_mask.resize(scaled_size, Image.ANTIALIAS)
 
-    img = np.asarray(p_img)
+    img = np.asarray(p_img).copy()
     mask = np.asarray(p_mask).copy()
     mask[mask < 90] = 0
 
-
     # POSITIVE
-    crop = crop_win(img, bbox=scaled_bbox, win_size=WIN_SIZE)
-    crop_mask = crop_win(mask, bbox=scaled_bbox, win_size=WIN_SIZE)
-
-    if filename == "IMAG0403.png" and False:
-        print(x, y, w, h, scaled_bbox, crop.shape)
-        cv.namedWindow("msk", cv.WINDOW_NORMAL)
-        cv.imshow("msk", np.asarray(p_mask))
-
-        cv.namedWindow("mask", cv.WINDOW_NORMAL)
-        cv.imshow("mask", mask)
-        cv.waitKey()
+    crop = crop_win(img, bbox=scaled_bbox, win_size=WIN_SIZE, pad=True)
+    crop_mask = crop_win(mask, bbox=scaled_bbox, win_size=WIN_SIZE, pad=True)
 
     #if crop_mask.shape == (WIN_SIZE, WIN_SIZE):
     save_crop_with_gt(crop=crop, crop_mask=crop_mask, idx=IDX_POS, path="{}/positive".format(OUT_PATH))

@@ -44,7 +44,7 @@ class MASDataset(Dataset):
 
         return {
             "label": torch.tensor(subdir != "negative"),
-            "bbox": torch.tensor(bbox),
+            "bbox": torch.tensor(bbox).unsqueeze(dim=1).unsqueeze(dim=1),
             "image": image.float()
         }
 
