@@ -2,6 +2,7 @@
 import os
 os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
 
+import argparse
 import torch
 import torch.nn.functional as F
 import torch.cuda
@@ -15,6 +16,37 @@ import model as zoo
 from tensorboardX import SummaryWriter
 import model.util as model_util
 
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--experiment_dir", action="store", required=True)
+parser.add_argument("--epoch_count", action="store", required=True, type=int)
+parser.add_argument("--train_dir", action="store", required=True)
+parser.add_argument("--val_dir", action="store", required=True)
+parser.add_argument("--model", action="store")
+parser.add_argument("--lr", action="store", type=float, default=1e-4)
+parser.add_argument("--batch_size", action="store", type=int, default=64)
+
+args = parser.parse_args()
+
+EPOCHS_COUNT = args["epoch_count"]
+BATCH_SIZE = args["batch_size"]
+LR = args["lr"]
+EXPERIMENTS_DIR = args["experiment_dir"]
+LOG_DIR = "{}/log".format(EXPERIMENTS_DIR)
+TRAIN_DATA_DIR = args["train_dir"]
+VAL_DATA_DIR = args["val_dir"]
+LOAD_MODEL_PATH = args["model"]
+
+"""
+EPOCHS_COUNT = 500
+BATCH_SIZE = 32
+LR = 1e-4
+EXPERIMENTS_DIR = "../experiment/29_pnet_24x24_v2_bn"
+LOG_DIR = "{}/log".format(EXPERIMENTS_DIR)
+TRAIN_DATA_DIR = "../dataset/syn_rnet_train_data_col_bg"
+VAL_DATA_DIR = "../dataset/rnet_val_data_rot_15"
+LOAD_MODEL_PATH = "model/weight/pnet_model_v2.pth"
+"""
 
 # ----------------------------------------------------------
 def run_epoch(model, optimizer, data_loader, dataset_size, backward=True):
@@ -57,16 +89,6 @@ def run_epoch(model, optimizer, data_loader, dataset_size, backward=True):
 
     return epoch_loss / float(dataset_size), epoch_acc / float(dataset_size)
 
-EPOCHS_COUNT = 500
-VIEW_STEP = 100
-BATCH_SIZE = 32
-LR = 1e-4
-EXPERIMENTS_DIR = "../experiment/29_pnet_24x24_v2_bn"
-LOG_DIR = "{}/log".format(EXPERIMENTS_DIR)
-TRAIN_DATA_DIR = "../dataset/syn_rnet_train_data_col_bg"
-VAL_DATA_DIR = "../dataset/rnet_val_data_rot_15"
-LOAD_MODEL_PATH = "model/weight/pnet_model_v2.pth"
-#LOAD_MODEL_PATH = "{}/model_exp_1_2_3.pth".format(EXPERIMENTS_DIR)
 start_epoch = 0
 current_epoch = 0
 best_acc = 0.
@@ -84,7 +106,8 @@ train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 model = zoo.ExtPnetA3()   # type: nn.Module
-start_epoch, best_acc = model_util.load(model, data=torch.load(LOAD_MODEL_PATH))
+if LOAD_MODEL_PATH:
+    start_epoch, best_acc = model_util.load(model, data=torch.load(LOAD_MODEL_PATH))
 
 model = model.to(dev)
 optimizer = torch.optim.SGD(params=model.parameters(), lr=LR, weight_decay=0)
