@@ -81,7 +81,7 @@ def run_epoch(model, optimizer, data_loader, dataset_size, backward=True):
 
         pred_label = F.softmax(pred_label, dim=1)
         if not output_flattened:
-            pred_label = pred_label.squeeze(dim=2).squeeze(dim=2)
+            pred_label = pred_label.squeeze(dim=1).squeeze(dim=1)
 
         acc = torch.sum(
             torch.argmax(pred_label, dim=1) == gt_label.long()).detach().cpu().item()
