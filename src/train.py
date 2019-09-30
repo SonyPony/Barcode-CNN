@@ -28,14 +28,14 @@ parser.add_argument("--batch_size", action="store", type=int, default=64)
 
 args = parser.parse_args()
 
-EPOCHS_COUNT = args["epoch_count"]
-BATCH_SIZE = args["batch_size"]
-LR = args["lr"]
-EXPERIMENTS_DIR = args["experiment_dir"]
+EPOCHS_COUNT = args.epoch_count
+BATCH_SIZE = args.batch_size
+LR = args.lr
+EXPERIMENTS_DIR = args.experiment_dir
 LOG_DIR = "{}/log".format(EXPERIMENTS_DIR)
-TRAIN_DATA_DIR = args["train_dir"]
-VAL_DATA_DIR = args["val_dir"]
-LOAD_MODEL_PATH = args["model"]
+TRAIN_DATA_DIR = args.train_dir
+VAL_DATA_DIR = args.val_dir
+LOAD_MODEL_PATH = args.model
 
 """
 EPOCHS_COUNT = 500
