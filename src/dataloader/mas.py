@@ -2,6 +2,7 @@
 import torch
 from torch.utils.data import Dataset
 import numpy as np
+import cv2 as cv
 import os
 from skimage import io
 
@@ -30,21 +31,23 @@ class MASDataset(Dataset):
             idx = idx - self._positive_len
 
         image = io.imread("{}/{}/{:06}.jpg".format(self._dir, subdir, idx))
-        bbox = (0, 0, 0, 0)
+        bbox = (0., 0., 0., 0.)
 
         if subdir != "negative":
             with open("{}/{}/{:06}.txt".format(self._dir, subdir, idx), "r+") as f:
-                bbox = tuple(map(int, f.read().split(" ")))
+                bbox = tuple(map(float, f.read().split(" ")))
 
         # TODO transform bbox?
-        image = image / 255. - 0.5
+        image = cv.cvtColor(image, cv.COLOR_RGB2GRAY)
+        image = np.dstack((image, image, image))
 
+        image = image / 255. - 0.5
         if self._transform:
             image = self._transform(image)
 
         return {
             "label": torch.tensor(subdir != "negative"),
-            "bbox": torch.tensor(bbox).unsqueeze(dim=1).unsqueeze(dim=1),
+            "bbox": torch.tensor(bbox),
             "image": image.float()
         }
 
