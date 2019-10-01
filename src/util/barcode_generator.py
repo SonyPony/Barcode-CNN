@@ -1,4 +1,6 @@
 # coding=utf-8
+from typing import Tuple, Optional
+
 from .color import random_bright_color
 from barcode.writer import ImageWriter
 import numpy as np
@@ -66,14 +68,15 @@ def random_barcode_with_bg(
     return result[..., :3], result[..., 3]
 
 
-def compose_barcode_with_bg(barcode: np.array, background: np.array, barcode_mask: np.array):
+def compose_barcode_with_bg(barcode: np.array, background: np.array, barcode_mask: np.array, translate_vector: Optional[Tuple]=None):
     barcode_norm_mask = barcode_mask / 255.
     barcode = np.dstack((barcode, barcode_mask))
 
     bg_size = np.array(background.shape[:2])
-
     barcode_size = np.array(barcode.shape[:2])
-    offsets = ((bg_size - barcode_size) / 2.).astype(int)
+
+    offsets = np.array(translate_vector) if translate_vector else ((bg_size - barcode_size) / 2.).astype(int)
+    assert np.all((barcode_size + offsets) <= np.array(background.shape[:2]))
 
     # blending
     result = np.zeros(shape=(*background.shape[:2], 4), dtype=np.uint8)
