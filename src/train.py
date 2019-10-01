@@ -25,6 +25,7 @@ parser.add_argument("--val_dir", action="store", required=True)
 parser.add_argument("--model", action="store")
 parser.add_argument("--lr", action="store", type=float, default=1e-4)
 parser.add_argument("--batch_size", action="store", type=int, default=64)
+parser.add_argument("--grayscale", action="store", type=bool, default=False)
 
 args = parser.parse_args()
 
@@ -97,8 +98,8 @@ best_acc = 0.
 dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device", dev)
 
-train_dataset = MASDataset(directory=TRAIN_DATA_DIR, transform=transforms.ToTensor())
-val_dataset = MASDataset(directory=VAL_DATA_DIR, transform=transforms.ToTensor())
+train_dataset = MASDataset(directory=TRAIN_DATA_DIR, transform=transforms.ToTensor(), grayscale=args.grayscale)
+val_dataset = MASDataset(directory=VAL_DATA_DIR, transform=transforms.ToTensor(), grayscale=args.grayscale)
 
 train_dataset_len = len(train_dataset)
 

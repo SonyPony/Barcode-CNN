@@ -8,9 +8,10 @@ from skimage import io
 
 
 class MASDataset(Dataset):
-    def __init__(self, directory, transform=None):
+    def __init__(self, directory, transform=None, grayscale=False):
         self._dir = directory
         self._transform = transform
+        self._grayscale = grayscale
 
         self._positive_len = len(os.listdir("{}/positive".format(self._dir))) // 2
         self._part_len = len(os.listdir("{}/part".format(self._dir))) // 2
@@ -38,8 +39,9 @@ class MASDataset(Dataset):
                 bbox = tuple(map(float, f.read().split(" ")))
 
         # TODO transform bbox?
-        image = cv.cvtColor(image, cv.COLOR_RGB2GRAY)
-        image = np.dstack((image, image, image))
+        if self._grayscale:
+            image = cv.cvtColor(image, cv.COLOR_RGB2GRAY)
+            image = np.dstack((image, image, image))
 
         image = image / 255. - 0.5
         if self._transform:
