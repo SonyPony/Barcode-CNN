@@ -37,6 +37,7 @@ for i in range(COUNT):
         quiet_zone=random.random() * 5 + 1,
         text_distance=random.random() * 3,
         background="white" if white_barcode_bg else "#{:02x}{:02x}{:02x}".format(*random_bright_color()),
+        foreground="#{}".format(3 * "{:02x}".format(random.randint(0, 80))),
         **static_barcode_options,
     )
     barcode = add_noise(img=barcode, noise_count=3)
@@ -60,13 +61,15 @@ for i in range(COUNT):
         x, y = random.randint(0, background.shape[1] - WIN_SIZE - 1), random.randint(0, background.shape[0] - WIN_SIZE - 1)
         background = background[y: y+WIN_SIZE, x: x+WIN_SIZE]
 
+    offset = None if not TRANSLATE else \
+        (random.randint(0, WIN_SIZE - barcode_size), random.randint(0, WIN_SIZE - barcode_size))
 
     result, result_mask = compose_barcode_with_bg(
         barcode=barcode,
         background=background,
-        barcode_mask=barcode_mask
+        barcode_mask=barcode_mask,
+        translate_vector=offset
     )
-
 
     """barcode, mask = random_barcode_with_bg(
         size_ratio=0 + random.random() / 2.5,
