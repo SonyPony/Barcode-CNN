@@ -8,14 +8,14 @@ import torch.nn.functional as F
 
 import matplotlib.pyplot as plt
 import math
-from model.p_net import PNet, RNet, ONet, ExtPnetA3
+import model as zoo
 from torchvision import transforms
 from util.image_pyramid import image_pyramid_scales
 from torch.autograd import Variable
 import torch.cuda
 
-
-MODEL_PATH = "../experiment/26_pnet_24x24_v2/best_model.pth"
+#/26_pnet_24x24_v2/
+MODEL_PATH = "../experiment/best_model.pth"
 #RNET_MODEL_PATH = "../experiment/06_rnet/model_exp_1_2_3_4_5_6_7_8.pth"
 RNET_MODEL_PATH = "../experiment/27_rnet/best_model.pth"
 ONET_MODEL_PATH = "../experiment/24_onet/best_model.pth"
@@ -316,7 +316,7 @@ def run_pnet(model, img, scale, threshold=0.6):
     return bounding_boxes.T
 
 
-model = ExtPnetA3()
+model = zoo.ExtPnetA3()
 model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu'))["weights"])
 model.eval()
 model = model.to(dev)
@@ -345,7 +345,7 @@ print('number of bounding boxes:', len(bounding_boxes))
 
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
-res.save("tt.png")
+res.save("../sample/1_p_net.png")
 #plt.imshow(res)
 #plt.show()
 
@@ -360,18 +360,18 @@ bounding_boxes = calibrate_box(bounding_boxes[:, 0:5], bounding_boxes[:, 5:])
 # shape [n_boxes, 5]
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
-res.save("tt_02v23.png")
+res.save("../sample/1_p_net_nms.png")
 
 bounding_boxes = convert_to_square(bounding_boxes)
 bounding_boxes[:, 0:4] = np.round(bounding_boxes[:, 0:4])
 print('number of bounding boxes:', len(bounding_boxes))
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
-res.save("tt_02v2.png")
+res.save("../sample/1_p_pnet_nms_square.png")
 plt.imshow(res)
 plt.show()
 
-rnet = RNet()
+rnet = zoo.RNet()
 rnet.load_state_dict(torch.load(RNET_MODEL_PATH, map_location=torch.device('cpu'))["weights"])
 rnet.eval()
 rnet = rnet.to(dev)
@@ -390,7 +390,7 @@ offsets = offsets[keep]
 
 print('number of bounding boxes:', len(bounding_boxes))
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
-res.save("tt_03.png")
+res.save("../sample/2_r_net.png")
 plt.imshow(res)
 plt.show()
 
@@ -402,13 +402,13 @@ bounding_boxes[:, 0:4] = np.round(bounding_boxes[:, 0:4])
 print('number of bounding boxes:', len(bounding_boxes))
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
-res.save("tt_03v2.png")
+res.save("../sample/2_r_net_nms.png")
 plt.imshow(res)
 plt.show()
 
 #plt.savefig("out.png")
 
-onet = ONet()
+onet = zoo.ONet()
 onet.load_state_dict(torch.load(ONET_MODEL_PATH, map_location=torch.device('cpu'))["weights"])
 onet.eval()
 onet = onet.to(dev)
@@ -432,7 +432,7 @@ xmin, ymin = bounding_boxes[:, 0], bounding_boxes[:, 1]
 print('number of bounding boxes:', len(bounding_boxes))
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
-res.save("tt_04.png")
+res.save("../sample/3_o_net.png")
 plt.imshow(res)
 plt.show()
 
@@ -446,6 +446,6 @@ bounding_boxes = calibrate_box(bounding_boxes, offsets)
 print('number of bounding boxes:', len(bounding_boxes))
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
-res.save("tt_04v2.png")
+res.save("../sample/3_o_net_nms.png")
 plt.imshow(res)
 plt.show()
