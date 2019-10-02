@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 import torch.functional as F
+from torchsummary import summary
 from collections import OrderedDict
 
 
@@ -34,6 +35,9 @@ class ExtRNet(RNetBase):
 
             ("conv5", nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3)),
             ("prelu5", nn.PReLU(num_parameters=64)),
+
+            ("conv6", nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3)),
+            ("prelu6", nn.PReLU(num_parameters=64)),
         ]))
 
         self.linear = nn.Sequential(OrderedDict([
@@ -92,3 +96,7 @@ class RNet(RNetBase):
         classification = self.classify_lin(x)
 
         return bbox_reg, classification
+
+if __name__ == "__main__":
+    model = ExtRNet()
+    summary(model, input_size=(3, 48, 48))
