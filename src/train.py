@@ -13,7 +13,8 @@ import numpy as np
 from dataloader.mas import MASDataset
 from torchvision import transforms, utils
 import model as zoo
-from tensorboardX import SummaryWriter
+#from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 import model.util as model_util
 
 
