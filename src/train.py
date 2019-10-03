@@ -142,6 +142,7 @@ try:
         writer.add_scalars("Watching/Loss", {"val": val_loss}, e + start_epoch)
         writer.add_scalars("Watching/Accuracy", {"train": train_acc}, e + start_epoch)
         writer.add_scalars("Watching/Accuracy", {"val": val_acc}, e + start_epoch)
+        writer.flush()
         writer.close()
 
 # SAVING MODEL
