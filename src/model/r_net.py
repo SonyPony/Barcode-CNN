@@ -78,7 +78,7 @@ class RNet(RNetBase):
         ]))
 
         self.linear = nn.Sequential(OrderedDict([
-            ("dropout1", nn.Dropout(0.25)),y
+            ("dropout1", nn.Dropout(0.25)),
             ("lin4", nn.Linear(in_features=576, out_features=128)),
             ("prelu4", nn.PReLU(num_parameters=128))
         ]))
