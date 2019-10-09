@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import inspect
 import os
 os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
 
@@ -18,6 +19,8 @@ from torch.utils.tensorboard import SummaryWriter
 import model.util as model_util
 
 
+models = dict(inspect.getmembers(zoo, lambda x : inspect.isclass(x) and issubclass(x, nn.Module)))
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--experiment_dir", action="store", required=True)
 parser.add_argument("--epoch_count", action="store", required=True, type=int)
@@ -27,6 +30,7 @@ parser.add_argument("--model", action="store")
 parser.add_argument("--lr", action="store", type=float, default=1e-4)
 parser.add_argument("--batch_size", action="store", type=int, default=64)
 parser.add_argument("--grayscale", action="store", type=bool, default=False)
+parser.add_argument("--model_type", action="store", required=True)
 
 args = parser.parse_args()
 
@@ -107,7 +111,7 @@ train_dataset_len = len(train_dataset)
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-model = zoo.ExtPnetA3()   # type: nn.Module
+model = models[args.model_type]   # type: nn.Module
 if LOAD_MODEL_PATH:
     start_epoch, best_acc = model_util.load(model, data=torch.load(LOAD_MODEL_PATH))
 
