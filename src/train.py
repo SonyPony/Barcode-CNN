@@ -107,7 +107,7 @@ train_dataset_len = len(train_dataset)
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-model = zoo.RNet()   # type: nn.Module
+model = zoo.ExtPnetA3()   # type: nn.Module
 if LOAD_MODEL_PATH:
     start_epoch, best_acc = model_util.load(model, data=torch.load(LOAD_MODEL_PATH))
 
