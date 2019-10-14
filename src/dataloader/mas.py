@@ -8,14 +8,30 @@ from skimage import io
 
 
 class MASDataset(Dataset):
-    def __init__(self, directory, transform=None, grayscale=False):
-        self._dir = directory
+    def __init__(self, directories, transform=None, grayscale=False):
+        self._dir = (directories, ) if isinstance(directories, str) else directories
         self._transform = transform
         self._grayscale = grayscale
 
-        self._positive_len = len(os.listdir("{}/positive".format(self._dir))) // 2
-        self._part_len = len(os.listdir("{}/part".format(self._dir))) // 2
-        self._negative_len = len(os.listdir("{}/negative".format(self._dir)))
+        self._data_path = {
+            "positive": list(),
+            "part": list(),
+            "negative": list()
+        }
+
+        for sub_folder in self._data_path.keys():
+            for single_dir in self._dir:
+                paths = filter(lambda x: not x.endswith(".txt"), map(
+                    lambda x: "/".join((single_dir, sub_folder, x)),
+                    os.listdir(os.path.join(self._dir, sub_folder))
+                ))
+
+                self._data_path[sub_folder].extend(paths)
+
+
+        self._positive_len = len(self._data_path["positive"])
+        self._part_len = len(self._data_path["part"])
+        self._negative_len = len(self._data_path["negative"])
 
     def __len__(self):
         return self._positive_len + self._part_len + self._negative_len
@@ -31,11 +47,13 @@ class MASDataset(Dataset):
             subdir = "part"
             idx = idx - self._positive_len
 
-        image = io.imread("{}/{}/{:06}.jpg".format(self._dir, subdir, idx))
+        #image = io.imread("{}/{}/{:06}.jpg".format(self._dir, subdir, idx))
+        image = io.imread(self._data_path[subdir][idx])
         bbox = (0., 0., 0., 0.)
 
         if subdir != "negative":
-            with open("{}/{}/{:06}.txt".format(self._dir, subdir, idx), "r+") as f:
+            # with open("{}/{}/{:06}.txt".format(self._dir, subdir, idx), "r+") as f:
+            with open(self._data_path[subdir][idx].replace(".jpg", ".txt"), "r+") as f:
                 bbox = tuple(map(float, f.read().split(" ")))
 
         # TODO transform bbox?

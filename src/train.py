@@ -103,8 +103,8 @@ best_acc = 0.
 dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device", dev)
 
-train_dataset = MASDataset(directory=TRAIN_DATA_DIR, transform=transforms.ToTensor(), grayscale=args.grayscale)
-val_dataset = MASDataset(directory=VAL_DATA_DIR, transform=transforms.ToTensor(), grayscale=args.grayscale)
+train_dataset = MASDataset(directories=TRAIN_DATA_DIR, transform=transforms.ToTensor(), grayscale=args.grayscale)
+val_dataset = MASDataset(directories=VAL_DATA_DIR, transform=transforms.ToTensor(), grayscale=args.grayscale)
 
 train_dataset_len = len(train_dataset)
 
