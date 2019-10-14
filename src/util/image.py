@@ -9,3 +9,9 @@ def resize(img, new_size):
 
     img = np.asarray(p_img)
     return img
+
+def iou_mask(mask):
+    area = mask.shape[0] * mask.shape[1]
+    count = np.sum(mask != 0)
+
+    return count / float(area)
