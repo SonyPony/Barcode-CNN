@@ -23,7 +23,7 @@ class MASDataset(Dataset):
             for single_dir in self._dir:
                 paths = filter(lambda x: not x.endswith(".txt"), map(
                     lambda x: "/".join((single_dir, sub_folder, x)),
-                    os.listdir(os.path.join(self._dir, sub_folder))
+                    os.listdir(os.path.join(single_dir, sub_folder))
                 ))
 
                 self._data_path[sub_folder].extend(paths)
