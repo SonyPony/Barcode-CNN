@@ -24,7 +24,7 @@ models = dict(inspect.getmembers(zoo, lambda x : inspect.isclass(x) and issubcla
 parser = argparse.ArgumentParser()
 parser.add_argument("--experiment_dir", action="store", required=True)
 parser.add_argument("--epoch_count", action="store", required=True, type=int)
-parser.add_argument("--train_dir", action="store", required=True)
+parser.add_argument("--train_dir", action="store", required=True, nargs='+')
 parser.add_argument("--val_dir", action="store", required=True)
 parser.add_argument("--model", action="store")
 parser.add_argument("--lr", action="store", type=float, default=1e-4)
