@@ -1,5 +1,8 @@
 # coding=utf-8
+import inspect
+
 import torch
+import argparse
 import cv2 as cv
 import numpy as np
 from PIL import Image, ImageDraw
@@ -13,19 +16,56 @@ from torchvision import transforms
 from util.image_pyramid import image_pyramid_scales
 from torch.autograd import Variable
 import torch.cuda
+import matplotlib as mpl
 
-#/26_pnet_24x24_v2/
-MODEL_PATH = "../experiment/best_model.pth"
-#RNET_MODEL_PATH = "../experiment/06_rnet/model_exp_1_2_3_4_5_6_7_8.pth"
-RNET_MODEL_PATH = "../experiment/27_rnet/best_model.pth"
-ONET_MODEL_PATH = "../experiment/24_onet/best_model.pth"
-INPUT_PATH = "../dataset/restructurized/01/data/000005.jpg"
-INPUT_PATH = "../dataset/IMG_2152.jpg"
-#INPUT_PATH = "../sample/office5.jpg"
+plt.axis('off')
+mpl.rcParams['figure.dpi'] = 300
+models = dict(inspect.getmembers(zoo, lambda x : inspect.isclass(x) and issubclass(x, nn.Module)))
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--input", action="store", required=True)
+parser.add_argument("--out", action="store", required=True)
+parser.add_argument("--pnet_type", action="store", required=True)
+parser.add_argument("--rnet_type", action="store", required=True)
+parser.add_argument("--onet_type", action="store", required=True)
+
+parser.add_argument("--pnet_model", action="store", required=True)
+parser.add_argument("--rnet_model", action="store", required=True)
+parser.add_argument("--onet_model", action="store", required=True)
+
+parser.add_argument("--pnet_grayscale", action="store", type=bool, default=False)
+parser.add_argument("--rnet_grayscale", action="store", type=bool, default=False)
+parser.add_argument("--onet_grayscale", action="store", type=bool, default=False)
+
+args = parser.parse_args()
+
+OUT_DIR = args.out
+PNET_MODEL_PATH = args.pnet_model
+RNET_MODEL_PATH = args.rnet_model
+ONET_MODEL_PATH = args.onet_model
+
+GRAY_PNET_INPUT = args.pnet_grayscale
+GRAY_RNET_INPUT = args.rnet_grayscale
+GRAY_ONET_INPUT = args.onet_grayscale
+
+PNET_TYPE = args.pnet_type
+RNET_TYPE = args.rnet_type
+ONET_TYPE = args.onet_type
+
+
+INPUT_PATH = args.input
+#INPUT_PATH = "../dataset/restructurized/03/data/000005.jpg"
+#INPUT_PATH = "../dataset/IMG_2152.jpg"
+#INPUT_PATH = "/".join((OUT_DIR, "office5.jpg"
 
 dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-from skimage import io
+
+def grayscale(img):
+    gray = cv.cvtColor(img, cv.COLOR_RGB2GRAY)
+    gray = np.dstack((gray, gray, gray))
+
+    return gray
 
 def correct_bboxes(bboxes, width, height):
     """Crop boxes that are too big and get coordinates
@@ -239,9 +279,6 @@ def calibrate_box(bboxes, offsets):
     # y2_true = y2 + ty2*h
     # below is just more compact form of this
 
-    # are offsets always such that
-    # x1 < x2 and y1 < y2 ?
-
     translation = np.hstack([w, h, w, h])*offsets
     bboxes[:, 0:4] = bboxes[:, 0:4] + translation
     return bboxes
@@ -278,9 +315,9 @@ def run_pnet(model, img, scale, threshold=0.6):
     WIN_SIZE = 24
 
     h, w = img.shape[:2]
-    # TODO remove
-    img = cv.cvtColor(img, cv.COLOR_RGB2GRAY)
-    img = np.dstack((img, img, img))
+
+    if GRAY_PNET_INPUT:
+        img = grayscale(img)
 
     img = Image.fromarray(img).resize((math.ceil(w * scale), math.ceil(h * scale)), Image.ANTIALIAS)
     img = transforms.ToTensor()(np.asarray(img, dtype=np.float32)) / 255. - 0.5
@@ -316,16 +353,15 @@ def run_pnet(model, img, scale, threshold=0.6):
     return bounding_boxes.T
 
 
-model = zoo.ExtPnetA3()
-model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu'))["weights"])
+model = models[PNET_TYPE]()
+model.load_state_dict(torch.load(PNET_MODEL_PATH)["weights"])
 model.eval()
 model = model.to(dev)
 
 img = np.asarray(Image.open(INPUT_PATH))
 
 # build pyramid
-#scales = image_pyramid_scales(img, factor=0.707, search_region=24, min_object_size=24)
-scales = image_pyramid_scales(img, factor=0.825, search_region=24, min_object_size=24)
+scales = image_pyramid_scales(img, factor=0.707, search_region=24, min_object_size=24)
 print('scales:', ['{:.2f}'.format(s) for s in scales])
 
 
@@ -345,7 +381,7 @@ print('number of bounding boxes:', len(bounding_boxes))
 
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
-res.save("../sample/1_p_net.png")
+res.save("/".join((OUT_DIR, "1_p_net.png")))
 #plt.imshow(res)
 #plt.show()
 
@@ -360,23 +396,23 @@ bounding_boxes = calibrate_box(bounding_boxes[:, 0:5], bounding_boxes[:, 5:])
 # shape [n_boxes, 5]
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
-res.save("../sample/1_p_net_nms.png")
+res.save("/".join((OUT_DIR, "1_p_net_nms.png")))
 
 bounding_boxes = convert_to_square(bounding_boxes)
 bounding_boxes[:, 0:4] = np.round(bounding_boxes[:, 0:4])
 print('number of bounding boxes:', len(bounding_boxes))
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
-res.save("../sample/1_p_pnet_nms_square.png")
+res.save("/".join((OUT_DIR, "1_p_pnet_nms_square.png")))
 plt.imshow(res)
 plt.show()
 
-rnet = zoo.RNet()
-rnet.load_state_dict(torch.load(RNET_MODEL_PATH, map_location=torch.device('cpu'))["weights"])
+rnet = models[RNET_TYPE]()
+rnet.load_state_dict(torch.load(RNET_MODEL_PATH)["weights"])
 rnet.eval()
 rnet = rnet.to(dev)
 
-img_boxes = get_image_boxes(bounding_boxes, img, size=24)
+img_boxes = get_image_boxes(bounding_boxes, grayscale(img) if GRAY_RNET_INPUT else img, size=24)
 img_boxes = Variable(torch.FloatTensor(img_boxes), volatile=True)
 
 offsets, probs = rnet(img_boxes.to(dev))
@@ -390,30 +426,30 @@ offsets = offsets[keep]
 
 print('number of bounding boxes:', len(bounding_boxes))
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
-res.save("../sample/2_r_net.png")
+res.save("/".join((OUT_DIR, "2_r_net.png")))
 plt.imshow(res)
 plt.show()
 
 keep = nms(bounding_boxes, 0.7)
 bounding_boxes = bounding_boxes[keep]
 bounding_boxes = calibrate_box(bounding_boxes, offsets[keep])
+res.save("/".join((OUT_DIR, "2_r_net_nms.png")))
 bounding_boxes = convert_to_square(bounding_boxes)
 bounding_boxes[:, 0:4] = np.round(bounding_boxes[:, 0:4])
 print('number of bounding boxes:', len(bounding_boxes))
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
-res.save("../sample/2_r_net_nms.png")
 plt.imshow(res)
 plt.show()
 
 #plt.savefig("out.png")
 
-onet = zoo.ONet()
-onet.load_state_dict(torch.load(ONET_MODEL_PATH, map_location=torch.device('cpu'))["weights"])
+onet = models[ONET_TYPE]()
+onet.load_state_dict(torch.load(ONET_MODEL_PATH)["weights"])
 onet.eval()
 onet = onet.to(dev)
 
-img_boxes = get_image_boxes(bounding_boxes, img, size=48)
+img_boxes = get_image_boxes(bounding_boxes, grayscale(img) if GRAY_ONET_INPUT else img, size=48)
 img_boxes = Variable(torch.FloatTensor(img_boxes), volatile=True)
 output = onet(img_boxes.to(dev))
 offsets = output[0].cpu().data.numpy()  # shape [n_boxes, 4]
@@ -432,7 +468,7 @@ xmin, ymin = bounding_boxes[:, 0], bounding_boxes[:, 1]
 print('number of bounding boxes:', len(bounding_boxes))
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
-res.save("../sample/3_o_net.png")
+res.save("/".join((OUT_DIR, "3_o_net.png")))
 plt.imshow(res)
 plt.show()
 
@@ -446,6 +482,6 @@ bounding_boxes = calibrate_box(bounding_boxes, offsets)
 print('number of bounding boxes:', len(bounding_boxes))
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
-res.save("../sample/3_o_net_nms.png")
+res.save("/".join((OUT_DIR, "3_o_net_nms.png")))
 plt.imshow(res)
 plt.show()
