@@ -29,7 +29,7 @@ parser.add_argument("--val_dir", action="store", required=True)
 parser.add_argument("--model", action="store")
 parser.add_argument("--lr", action="store", type=float, default=1e-4)
 parser.add_argument("--batch_size", action="store", type=int, default=64)
-parser.add_argument("--grayscale", action="store", type=bool, default=False)
+parser.add_argument("--grayscale", action="store", type=int, default=0)
 parser.add_argument("--model_type", action="store", required=True)
 
 args = parser.parse_args()

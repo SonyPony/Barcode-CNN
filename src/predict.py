@@ -33,9 +33,9 @@ parser.add_argument("--pnet_model", action="store", required=True)
 parser.add_argument("--rnet_model", action="store", required=True)
 parser.add_argument("--onet_model", action="store", required=True)
 
-parser.add_argument("--pnet_grayscale", action="store", type=bool, default=False)
-parser.add_argument("--rnet_grayscale", action="store", type=bool, default=False)
-parser.add_argument("--onet_grayscale", action="store", type=bool, default=False)
+parser.add_argument("--pnet_grayscale", action="store", type=int, default=0)
+parser.add_argument("--rnet_grayscale", action="store", type=int, default=0)
+parser.add_argument("--onet_grayscale", action="store", type=int, default=0)
 
 args = parser.parse_args()
 
