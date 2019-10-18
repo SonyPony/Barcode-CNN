@@ -420,7 +420,7 @@ rnet.load_state_dict(torch.load(RNET_MODEL_PATH)["weights"])
 rnet.eval()
 rnet = rnet.to(dev)
 
-with measure_time(print_format="RPredict Net: {:.4f}s"):
+with measure_time(print_format="Predict RNet: {:.4f}s"):
     img_boxes = get_image_boxes(bounding_boxes, grayscale(img) if GRAY_RNET_INPUT else img, size=24)
     img_boxes = Variable(torch.FloatTensor(img_boxes), volatile=True)
 
