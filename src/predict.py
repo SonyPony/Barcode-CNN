@@ -17,6 +17,9 @@ from util.image_pyramid import image_pyramid_scales
 from torch.autograd import Variable
 import torch.cuda
 import matplotlib as mpl
+from time import time
+
+from util.time_measure import measure_time
 
 plt.axis('off')
 mpl.rcParams['figure.dpi'] = 300
@@ -361,22 +364,26 @@ model = model.to(dev)
 img = np.asarray(Image.open(INPUT_PATH))
 
 # build pyramid
-scales = image_pyramid_scales(img, factor=0.707, search_region=24, min_object_size=24)
+
+with measure_time(print_format="Scales: {:.4f}s"):
+    scales = image_pyramid_scales(img, factor=0.707, search_region=24, min_object_size=24)
 print('scales:', ['{:.2f}'.format(s) for s in scales])
 
 
 bounding_boxes = []
 
 # run P-Net on different scales
-for s in scales:
-    #boxes = run_first_stage(image, pnet, scale=s, threshold=thresholds[0])
-    boxes = run_pnet(model=model, img=img, scale=s, threshold=0.6)
-    if boxes.size != 0:
-        bounding_boxes.append(boxes)
+with measure_time(print_format="Predict PNet: {:.4f}s"):
+    for s in scales:
+        #boxes = run_first_stage(image, pnet, scale=s, threshold=thresholds[0])
+        boxes = run_pnet(model=model, img=img, scale=s, threshold=0.6)
+        if boxes.size != 0:
+            bounding_boxes.append(boxes)
 
 # collect boxes (and offsets, and scores) from different scales
-bounding_boxes = [i for i in bounding_boxes if i is not None]
-bounding_boxes = np.vstack(bounding_boxes)
+with measure_time(print_format="Stack RNet input: {:.4f}s"):
+    bounding_boxes = [i for i in bounding_boxes if i is not None]
+    bounding_boxes = np.vstack(bounding_boxes)
 print('number of bounding boxes:', len(bounding_boxes))
 
 
@@ -387,9 +394,10 @@ res.save("/".join((OUT_DIR, "1_p_net.png")))
 
 # TODO use?
 
-keep = nms(bounding_boxes, 0.7)
-bounding_boxes = bounding_boxes[keep]
-bounding_boxes = calibrate_box(bounding_boxes[:, 0:5], bounding_boxes[:, 5:])
+with measure_time(print_format="NMS + calibrate: {:.4f}s"):
+    keep = nms(bounding_boxes, 0.7)
+    bounding_boxes = bounding_boxes[keep]
+    bounding_boxes = calibrate_box(bounding_boxes[:, 0:5], bounding_boxes[:, 5:])
 
 # use offsets predicted by pnet to transform bounding boxes
 
@@ -412,17 +420,18 @@ rnet.load_state_dict(torch.load(RNET_MODEL_PATH)["weights"])
 rnet.eval()
 rnet = rnet.to(dev)
 
-img_boxes = get_image_boxes(bounding_boxes, grayscale(img) if GRAY_RNET_INPUT else img, size=24)
-img_boxes = Variable(torch.FloatTensor(img_boxes), volatile=True)
+with measure_time(print_format="RPredict Net: {:.4f}s"):
+    img_boxes = get_image_boxes(bounding_boxes, grayscale(img) if GRAY_RNET_INPUT else img, size=24)
+    img_boxes = Variable(torch.FloatTensor(img_boxes), volatile=True)
 
-offsets, probs = rnet(img_boxes.to(dev))
-offsets = offsets.cpu().data.numpy()  # shape [n_boxes, 4]
-probs = probs.cpu().data.numpy()  # shape [n_boxes, 2]
+    offsets, probs = rnet(img_boxes.to(dev))
+    offsets = offsets.cpu().data.numpy()  # shape [n_boxes, 4]
+    probs = probs.cpu().data.numpy()  # shape [n_boxes, 2]
 
-keep = np.where(probs[:, 1] > 0.7)[0]
-bounding_boxes = bounding_boxes[keep]
-bounding_boxes[:, 4] = probs[keep, 1].reshape((-1,))
-offsets = offsets[keep]
+    keep = np.where(probs[:, 1] > 0.7)[0]
+    bounding_boxes = bounding_boxes[keep]
+    bounding_boxes[:, 4] = probs[keep, 1].reshape((-1,))
+    offsets = offsets[keep]
 
 print('number of bounding boxes:', len(bounding_boxes))
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
@@ -430,12 +439,13 @@ res.save("/".join((OUT_DIR, "2_r_net.png")))
 plt.imshow(res)
 plt.show()
 
-keep = nms(bounding_boxes, 0.7)
-bounding_boxes = bounding_boxes[keep]
-bounding_boxes = calibrate_box(bounding_boxes, offsets[keep])
-res.save("/".join((OUT_DIR, "2_r_net_nms.png")))
-bounding_boxes = convert_to_square(bounding_boxes)
-bounding_boxes[:, 0:4] = np.round(bounding_boxes[:, 0:4])
+with measure_time(print_format="NMS + calibrate: {:.4f}s"):
+    keep = nms(bounding_boxes, 0.7)
+    bounding_boxes = bounding_boxes[keep]
+    bounding_boxes = calibrate_box(bounding_boxes, offsets[keep])
+    res.save("/".join((OUT_DIR, "2_r_net_nms.png")))
+    bounding_boxes = convert_to_square(bounding_boxes)
+    bounding_boxes[:, 0:4] = np.round(bounding_boxes[:, 0:4])
 print('number of bounding boxes:', len(bounding_boxes))
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
@@ -449,16 +459,17 @@ onet.load_state_dict(torch.load(ONET_MODEL_PATH)["weights"])
 onet.eval()
 onet = onet.to(dev)
 
-img_boxes = get_image_boxes(bounding_boxes, grayscale(img) if GRAY_ONET_INPUT else img, size=48)
-img_boxes = Variable(torch.FloatTensor(img_boxes), volatile=True)
-output = onet(img_boxes.to(dev))
-offsets = output[0].cpu().data.numpy()  # shape [n_boxes, 4]
-probs = output[1].cpu().data.numpy()  # shape [n_boxes, 2]
+with measure_time(print_format="ONet predict: {:.4f}s"):
+    img_boxes = get_image_boxes(bounding_boxes, grayscale(img) if GRAY_ONET_INPUT else img, size=48)
+    img_boxes = Variable(torch.FloatTensor(img_boxes), volatile=True)
+    output = onet(img_boxes.to(dev))
+    offsets = output[0].cpu().data.numpy()  # shape [n_boxes, 4]
+    probs = output[1].cpu().data.numpy()  # shape [n_boxes, 2]
 
-keep = np.where(probs[:, 1] > 0.8)[0]
-bounding_boxes = bounding_boxes[keep]
-bounding_boxes[:, 4] = probs[keep, 1].reshape((-1,))
-offsets = offsets[keep]
+    keep = np.where(probs[:, 1] > 0.8)[0]
+    bounding_boxes = bounding_boxes[keep]
+    bounding_boxes[:, 4] = probs[keep, 1].reshape((-1,))
+    offsets = offsets[keep]
 
 # compute landmark points
 width = bounding_boxes[:, 2] - bounding_boxes[:, 0] + 1.0
@@ -473,13 +484,13 @@ plt.imshow(res)
 plt.show()
 
 
+with measure_time(print_format="NMS + calibrate: {:.4f}s"):
+    keep = nms(bounding_boxes, 0.7, mode='min')
 
-keep = nms(bounding_boxes, 0.7, mode='min')
-
-bounding_boxes = bounding_boxes[keep]
-offsets = offsets[keep]
-bounding_boxes = calibrate_box(bounding_boxes, offsets)
-print('number of bounding boxes:', len(bounding_boxes))
+    bounding_boxes = bounding_boxes[keep]
+    offsets = offsets[keep]
+    bounding_boxes = calibrate_box(bounding_boxes, offsets)
+    print('number of bounding boxes:', len(bounding_boxes))
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
 res.save("/".join((OUT_DIR, "3_o_net_nms.png")))
