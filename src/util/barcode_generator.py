@@ -6,6 +6,7 @@ from barcode.writer import ImageWriter
 import numpy as np
 import barcode as bc
 from PIL import Image
+import scipy.ndimage as ndimage
 
 
 def random_barcode(rotation_angle, **kwargs):
@@ -69,21 +70,35 @@ def random_barcode_with_bg(
 
 
 def compose_barcode_with_bg(barcode: np.array, background: np.array, barcode_mask: np.array, translate_vector: Optional[Tuple]=None):
-    barcode_norm_mask = barcode_mask / 255.
     barcode = np.dstack((barcode, barcode_mask))
 
     bg_size = np.array(background.shape[:2])
     barcode_size = np.array(barcode.shape[:2])
 
-    offsets = np.array(translate_vector) if translate_vector else ((bg_size - barcode_size) / 2.).astype(int)
+    #offsets = np.array(translate_vector) if translate_vector else ((bg_size - barcode_size) / 2.).astype(int)
+    offsets = ((bg_size - barcode_size) / 2.).astype(int)
     assert np.all((barcode_size + offsets) <= np.array(background.shape[:2]))
 
+    centered_barcode_mask = np.zeros(background.shape[:2], dtype=np.uint8)
+    centered_barcode = np.zeros(background.shape[:2] + (4, ), dtype=np.uint8)
+    centered_barcode_mask[offsets[0]: offsets[0] + barcode_size[0], offsets[1]: offsets[1] + barcode_size[1]] = \
+        barcode_mask
+    centered_barcode[offsets[0]: offsets[0] + barcode_size[0], offsets[1]: offsets[1] + barcode_size[1]] = \
+        barcode
+
+
+    barcode_mask = ndimage.interpolation.shift(centered_barcode_mask, shift=translate_vector)
+    barcode = ndimage.interpolation.shift(centered_barcode, shift=translate_vector + (0, ))
+
     # blending
+    barcode_norm_mask = barcode_mask / 255.
     result = np.zeros(shape=(*background.shape[:2], 4), dtype=np.uint8)
     result[..., :3] = background
 
-    target_area = result[offsets[0]: offsets[0] + barcode_size[0], offsets[1]: offsets[1] + barcode_size[1]]
-    target_area[...] = (1. - barcode_norm_mask[..., None]) * target_area \
-                       + barcode_norm_mask[..., None] * barcode
+    #target_area = result[offsets[0]: offsets[0] + barcode_size[0], offsets[1]: offsets[1] + barcode_size[1]]
+    """target_area[...] = (1. - barcode_norm_mask[..., None]) * target_area \
+                       + barcode_norm_mask[..., None] * barcode"""
+    result = ((1. - barcode_norm_mask[..., None]) * result
+              + barcode_norm_mask[..., None] * barcode).astype(np.uint8)
 
     return result[..., :3], result[..., 3]
