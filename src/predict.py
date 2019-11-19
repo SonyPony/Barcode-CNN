@@ -378,7 +378,7 @@ model.eval()
 model = model.to(dev)
 
 img = np.asarray(Image.open(INPUT_PATH))
-grads = compute_gradients(img)
+grads = compute_gradients(img)[..., np.newaxis]
 
 # build pyramid
 
