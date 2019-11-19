@@ -6,12 +6,17 @@ import cv2 as cv
 import os
 from skimage import io
 
+from util.filter import sobel_gradients
+
 
 class MASDataset(Dataset):
-    def __init__(self, directories, transform=None, grayscale=False):
+    def __init__(self, directories, transform=None, grayscale=False, gradient=False):
+        print("MAS dataset use gradients:", gradient)
+
         self._dir = (directories, ) if isinstance(directories, str) else directories
         self._transform = transform
         self._grayscale = grayscale
+        self._gradient = gradient
 
         self._data_path = {
             "positive": list(),
@@ -60,6 +65,10 @@ class MASDataset(Dataset):
         if self._grayscale:
             image = cv.cvtColor(image, cv.COLOR_RGB2GRAY)
             image = np.dstack((image, image, image))
+
+        if self._gradient:
+            grad = ((sobel_gradients(cv.cvtColor(image, cv.COLOR_BGR2GRAY)) > 120) * 255).astype(np.uint8)
+            image = np.dstack((image, grad))
 
         image = image / 255. - 0.5
         if self._transform:

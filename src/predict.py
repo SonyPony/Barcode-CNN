@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 import math
 import model as zoo
 from torchvision import transforms
+
+from util.filter import sobel_gradients
 from util.image_pyramid import image_pyramid_scales
 from torch.autograd import Variable
 import torch.cuda
@@ -39,6 +41,7 @@ parser.add_argument("--onet_model", action="store", required=True)
 parser.add_argument("--pnet_grayscale", action="store", type=int, default=0)
 parser.add_argument("--rnet_grayscale", action="store", type=int, default=0)
 parser.add_argument("--onet_grayscale", action="store", type=int, default=0)
+parser.add_argument("--onet_gradient", action="store", type=int, default=0)
 
 args = parser.parse_args()
 
@@ -55,6 +58,8 @@ PNET_TYPE = args.pnet_type
 RNET_TYPE = args.rnet_type
 ONET_TYPE = args.onet_type
 
+ONET_GRADIENT = args.onet_gradient
+
 
 INPUT_PATH = args.input
 #INPUT_PATH = "../dataset/restructurized/03/data/000005.jpg"
@@ -63,6 +68,9 @@ INPUT_PATH = args.input
 
 dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+
+def compute_gradients(img):
+    return ((sobel_gradients(cv.cvtColor(img, cv.COLOR_BGR2GRAY)) > 120) * 255).astype(np.uint8)
 
 def grayscale(img):
     gray = cv.cvtColor(img, cv.COLOR_RGB2GRAY)
@@ -142,7 +150,7 @@ def _preprocess(img):
     img = img / 255. - 0.5
     return img
 
-def get_image_boxes(bounding_boxes, img, size=24):
+def get_image_boxes(bounding_boxes, img, size=24, grads=None):
     """Cut out boxes from the image.
     Arguments:
         bounding_boxes: a float numpy array of shape [n, 5].
@@ -152,22 +160,30 @@ def get_image_boxes(bounding_boxes, img, size=24):
         a float numpy array of shape [n, 3, size, size].
     """
 
+    use_grads = not (grads is None)
+    print("Use gradients:", use_grads)
+    channel_count = 4 if use_grads else 3
+
     num_boxes = len(bounding_boxes)
     height, width = img.shape[:2]
 
     [dy, edy, dx, edx, y, ey, x, ex, w, h] = correct_bboxes(bounding_boxes, width, height)
-    img_boxes = np.zeros((num_boxes, 3, size, size), 'float32')
+    img_boxes = np.zeros((num_boxes, channel_count, size, size), 'float32')
 
     for i in range(num_boxes):
-        img_box = np.zeros((h[i], w[i], 3), 'uint8')
+        img_box = np.zeros((h[i], w[i], channel_count), 'uint8')
 
         img_array = np.asarray(img, 'uint8')
+        if use_grads:
+            img_array = np.stack((img_array, grads))
+
         img_box[dy[i]:(edy[i] + 1), dx[i]:(edx[i] + 1), :] =\
             img_array[y[i]:(ey[i] + 1), x[i]:(ex[i] + 1), :]
 
         # resize
         img_box = Image.fromarray(img_box)
-        img_box = img_box.resize((size, size), Image.BILINEAR)
+        img_box = img_box.resize((size, size), Image.ANTIALIAS)
+        #img_box = img_box.resize((size, size), Image.BILINEAR)
         img_box = np.asarray(img_box, 'float32')
 
         img_boxes[i, :, :, :] = _preprocess(img_box)
@@ -362,6 +378,7 @@ model.eval()
 model = model.to(dev)
 
 img = np.asarray(Image.open(INPUT_PATH))
+grads = compute_gradients(img)
 
 # build pyramid
 
@@ -460,7 +477,8 @@ onet.eval()
 onet = onet.to(dev)
 
 with measure_time(print_format="ONet predict: {:.4f}s"):
-    img_boxes = get_image_boxes(bounding_boxes, grayscale(img) if GRAY_ONET_INPUT else img, size=48)
+    grads = grads if ONET_GRADIENT else None
+    img_boxes = get_image_boxes(bounding_boxes, grayscale(img) if GRAY_ONET_INPUT else img, size=48, grads=grads)
     img_boxes = Variable(torch.FloatTensor(img_boxes), volatile=True)
     output = onet(img_boxes.to(dev))
     offsets = output[0].cpu().data.numpy()  # shape [n_boxes, 4]

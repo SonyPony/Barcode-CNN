@@ -31,6 +31,7 @@ parser.add_argument("--lr", action="store", type=float, default=1e-4)
 parser.add_argument("--batch_size", action="store", type=int, default=64)
 parser.add_argument("--grayscale", action="store", type=int, default=0)
 parser.add_argument("--model_type", action="store", required=True)
+parser.add_argument("--gradient", action="store", type=int, default=0)
 
 args = parser.parse_args()
 
@@ -42,6 +43,7 @@ LOG_DIR = "{}/log".format(EXPERIMENTS_DIR)
 TRAIN_DATA_DIR = args.train_dir
 VAL_DATA_DIR = args.val_dir
 LOAD_MODEL_PATH = args.model
+GRADIENT = args.gradient
 
 """
 EPOCHS_COUNT = 500
@@ -103,8 +105,8 @@ best_acc = 0.
 dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device", dev)
 
-train_dataset = MASDataset(directories=TRAIN_DATA_DIR, transform=transforms.ToTensor(), grayscale=args.grayscale)
-val_dataset = MASDataset(directories=VAL_DATA_DIR, transform=transforms.ToTensor(), grayscale=args.grayscale)
+train_dataset = MASDataset(directories=TRAIN_DATA_DIR, transform=transforms.ToTensor(), grayscale=args.grayscale, gradient=GRADIENT)
+val_dataset = MASDataset(directories=VAL_DATA_DIR, transform=transforms.ToTensor(), grayscale=args.grayscale, gradient=GRADIENT)
 
 train_dataset_len = len(train_dataset)
 
