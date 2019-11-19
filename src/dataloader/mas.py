@@ -24,11 +24,30 @@ class MASDataset(Dataset):
             "negative": list()
         }
 
+        self._data_grad_path = {
+            "positive": list(),
+            "part": list(),
+            "negative": list()
+        }
+
         for sub_folder in self._data_path.keys():
             for single_dir in self._dir:
+                data_dir = single_dir
+
+                if self._gradient:
+                    data_dir = os.path.join(data_dir, "data")
+                    grad_dir = os.path.join(single_dir, "grad")
+
+                    grad_paths = map(
+                        lambda x: "/".join((grad_dir, sub_folder, x)),
+                        os.listdir(os.path.join(grad_dir, sub_folder))
+                    )
+
+                    self._data_grad_path[sub_folder].extend(grad_paths)
+
                 paths = filter(lambda x: not x.endswith(".txt"), map(
-                    lambda x: "/".join((single_dir, sub_folder, x)),
-                    os.listdir(os.path.join(single_dir, sub_folder))
+                    lambda x: "/".join((data_dir, sub_folder, x)),
+                    os.listdir(os.path.join(data_dir, sub_folder))
                 ))
 
                 self._data_path[sub_folder].extend(paths)
@@ -67,7 +86,8 @@ class MASDataset(Dataset):
             image = np.dstack((image, image, image))
 
         if self._gradient:
-            grad = ((sobel_gradients(cv.cvtColor(image, cv.COLOR_BGR2GRAY)) > 120) * 255).astype(np.uint8)
+            #TODO add gradient
+            grad = io.imread(self._data_grad_path[subdir][idx], as_gray=True)
             image = np.dstack((image, grad))
 
         image = image / 255. - 0.5
