@@ -175,6 +175,7 @@ def get_image_boxes(bounding_boxes, img, size=24, grads=None):
 
         img_array = np.asarray(img, 'uint8')
         if use_grads:
+            print(img_array.shape, grads.shape)
             img_array = np.stack((img_array, grads))
 
         img_box[dy[i]:(edy[i] + 1), dx[i]:(edx[i] + 1), :] =\
