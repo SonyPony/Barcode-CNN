@@ -14,12 +14,14 @@ import math
 import model as zoo
 from torchvision import transforms
 
+from util.image import resize
 from util.filter import sobel_gradients
 from util.image_pyramid import image_pyramid_scales
 from torch.autograd import Variable
 import torch.cuda
 import matplotlib as mpl
 from time import time
+from skimage import io
 
 from util.time_measure import measure_time
 
@@ -70,7 +72,7 @@ dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 def compute_gradients(img):
-    return ((sobel_gradients(cv.cvtColor(img, cv.COLOR_BGR2GRAY)) > 120) * 255).astype(np.uint8)
+    return ((sobel_gradients(cv.cvtColor(img, cv.COLOR_RGB2GRAY)) > 120) * 255).astype(np.uint8)
 
 def grayscale(img):
     gray = cv.cvtColor(img, cv.COLOR_RGB2GRAY)
@@ -161,6 +163,7 @@ def get_image_boxes(bounding_boxes, img, size=24, grads=None):
     """
 
     use_grads = not (grads is None)
+
     print("Use gradients:", use_grads)
     channel_count = 4 if use_grads else 3
 
@@ -181,10 +184,18 @@ def get_image_boxes(bounding_boxes, img, size=24, grads=None):
             img_array[y[i]:(ey[i] + 1), x[i]:(ex[i] + 1), :]
 
         # resize
-        img_box = Image.fromarray(img_box)
+        if use_grads:
+            grad_box = img_box[..., 3]
+
+        img_box = Image.fromarray(img_box[..., :3])
         img_box = img_box.resize((size, size), Image.ANTIALIAS)
         #img_box = img_box.resize((size, size), Image.BILINEAR)
         img_box = np.asarray(img_box, 'float32')
+
+        if use_grads:
+            grad_box = Image.fromarray(grad_box, "L")
+            grad_box = resize(grad_box, (size, size)).astype(np.float32)
+            img_box = np.dstack((img_box, grad_box))
 
         img_boxes[i, :, :, :] = _preprocess(img_box)
 
@@ -478,7 +489,12 @@ onet = onet.to(dev)
 
 with measure_time(print_format="ONet predict: {:.4f}s"):
     grads = grads if ONET_GRADIENT else None
-    img_boxes = get_image_boxes(bounding_boxes, grayscale(img) if GRAY_ONET_INPUT else img, size=48, grads=grads)
+    img_boxes = get_image_boxes(
+        bounding_boxes,
+        grayscale(img) if GRAY_ONET_INPUT else img,
+        size=48,
+        grads=grads
+    )
     img_boxes = Variable(torch.FloatTensor(img_boxes), volatile=True)
     output = onet(img_boxes.to(dev))
     offsets = output[0].cpu().data.numpy()  # shape [n_boxes, 4]
