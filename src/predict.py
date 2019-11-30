@@ -394,7 +394,7 @@ grads = compute_gradients(img)[..., np.newaxis]
 # build pyramid
 
 with measure_time(print_format="Scales: {:.4f}s"):
-    scales = image_pyramid_scales(img, factor=0.707, search_region=24, min_object_size=24)
+    scales = image_pyramid_scales(img, factor=0.707, search_region=24, min_object_size=70)
 print('scales:', ['{:.2f}'.format(s) for s in scales])
 
 
