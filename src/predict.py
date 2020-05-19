@@ -44,6 +44,7 @@ parser.add_argument("--pnet_grayscale", action="store", type=int, default=0)
 parser.add_argument("--rnet_grayscale", action="store", type=int, default=0)
 parser.add_argument("--onet_grayscale", action="store", type=int, default=0)
 parser.add_argument("--onet_gradient", action="store", type=int, default=0)
+parser.add_argument("--use_nms", action="store", type=int, default=1)
 
 args = parser.parse_args()
 
@@ -64,6 +65,7 @@ ONET_GRADIENT = args.onet_gradient
 
 
 INPUT_PATH = args.input
+use_nms = args.use_nms
 #INPUT_PATH = "../dataset/restructurized/03/data/000005.jpg"
 #INPUT_PATH = "../dataset/IMG_2152.jpg"
 #INPUT_PATH = "/".join((OUT_DIR, "office5.jpg"
@@ -422,10 +424,11 @@ res.save("/".join((OUT_DIR, "1_p_net.png")))
 
 # TODO use?
 
-with measure_time(print_format="NMS + calibrate: {:.4f}s"):
-    keep = nms(bounding_boxes, 0.7)
-    bounding_boxes = bounding_boxes[keep]
-    bounding_boxes = calibrate_box(bounding_boxes[:, 0:5], bounding_boxes[:, 5:])
+if use_nms:
+    with measure_time(print_format="NMS + calibrate: {:.4f}s"):
+        keep = nms(bounding_boxes, 0.7)
+        bounding_boxes = bounding_boxes[keep]
+        bounding_boxes = calibrate_box(bounding_boxes[:, 0:5], bounding_boxes[:, 5:])
 
 # use offsets predicted by pnet to transform bounding boxes
 
@@ -467,13 +470,14 @@ res.save("/".join((OUT_DIR, "2_r_net.png")))
 plt.imshow(res)
 plt.show()
 
-with measure_time(print_format="NMS + calibrate: {:.4f}s"):
-    keep = nms(bounding_boxes, 0.7)
-    bounding_boxes = bounding_boxes[keep]
-    bounding_boxes = calibrate_box(bounding_boxes, offsets[keep])
-    res.save("/".join((OUT_DIR, "2_r_net_nms.png")))
-    bounding_boxes = convert_to_square(bounding_boxes)
-    bounding_boxes[:, 0:4] = np.round(bounding_boxes[:, 0:4])
+if use_nms:
+    with measure_time(print_format="NMS + calibrate: {:.4f}s"):
+        keep = nms(bounding_boxes, 0.7)
+        bounding_boxes = bounding_boxes[keep]
+        bounding_boxes = calibrate_box(bounding_boxes, offsets[keep])
+        res.save("/".join((OUT_DIR, "2_r_net_nms.png")))
+        bounding_boxes = convert_to_square(bounding_boxes)
+        bounding_boxes[:, 0:4] = np.round(bounding_boxes[:, 0:4])
 print('number of bounding boxes:', len(bounding_boxes))
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
@@ -517,14 +521,14 @@ res.save("/".join((OUT_DIR, "3_o_net.png")))
 plt.imshow(res)
 plt.show()
 
+if use_nms:
+    with measure_time(print_format="NMS + calibrate: {:.4f}s"):
+        keep = nms(bounding_boxes, 0.7, mode='min')
 
-with measure_time(print_format="NMS + calibrate: {:.4f}s"):
-    keep = nms(bounding_boxes, 0.7, mode='min')
-
-    bounding_boxes = bounding_boxes[keep]
-    offsets = offsets[keep]
-    bounding_boxes = calibrate_box(bounding_boxes, offsets)
-    print('number of bounding boxes:', len(bounding_boxes))
+        bounding_boxes = bounding_boxes[keep]
+        offsets = offsets[keep]
+        bounding_boxes = calibrate_box(bounding_boxes, offsets)
+        print('number of bounding boxes:', len(bounding_boxes))
 
 res = show_bboxes(Image.open(INPUT_PATH), bounding_boxes)
 res.save("/".join((OUT_DIR, "3_o_net_nms.png")))
