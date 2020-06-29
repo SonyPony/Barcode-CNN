@@ -14,15 +14,14 @@ import numpy as np
 from dataloader.mas import MASDataset
 from torchvision import transforms, utils
 import model as zoo
-#from tensorboardX import SummaryWriter
 from torch.utils.tensorboard import SummaryWriter
 import model.util as model_util
+import wandb
 
 
 models = dict(inspect.getmembers(zoo, lambda x : inspect.isclass(x) and issubclass(x, nn.Module)))
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--experiment_dir", action="store", required=True)
 parser.add_argument("--epoch_count", action="store", required=True, type=int)
 parser.add_argument("--train_dir", action="store", required=True, nargs='+')
 parser.add_argument("--val_dir", action="store", required=True)
@@ -38,26 +37,39 @@ args = parser.parse_args()
 EPOCHS_COUNT = args.epoch_count
 BATCH_SIZE = args.batch_size
 LR = args.lr
-EXPERIMENTS_DIR = args.experiment_dir
-LOG_DIR = "{}/log".format(EXPERIMENTS_DIR)
 TRAIN_DATA_DIR = args.train_dir
 VAL_DATA_DIR = args.val_dir
 LOAD_MODEL_PATH = args.model
 GRADIENT = args.gradient
+# Login into wandb
+os.system("wandb login 3cd8a6fff84595b3101d186ceece689768431faf")
 
-"""
-EPOCHS_COUNT = 500
-BATCH_SIZE = 32
-LR = 1e-4
-EXPERIMENTS_DIR = "../experiment/29_pnet_24x24_v2_bn"
-LOG_DIR = "{}/log".format(EXPERIMENTS_DIR)
-TRAIN_DATA_DIR = "../dataset/syn_rnet_train_data_col_bg"
-VAL_DATA_DIR = "../dataset/rnet_val_data_rot_15"
-LOAD_MODEL_PATH = "model/weight/pnet_model_v2.pth"
-"""
+class PredictionSampleHolder:
+    def __init__(self):
+        self.image, self.gt_bbox, self.pred_bbox, self.gt_label, self.pred_label = (None, ) * 5
+
+    def __call__(self, i, pred_bbox, pred_label, gt_label, gt_bbox, image):
+        if i:
+            return
+        self.image = image
+        self.pred_bbox = pred_bbox
+        self.pred_label = pred_label
+        self.gt_label = gt_label
+        self.gt_bbox = gt_bbox
+
+    def __iter__(self):
+        self._i = 0
+        return self
+
+    def __next__(self):
+        i = self._i
+        if i >= self.image.size()[0]:
+            raise StopIteration
+        self._i += 1
+        return self.image[i], self.pred_bbox[i], self.pred_label[i], self.gt_bbox[i], self.gt_label[i]
 
 # ----------------------------------------------------------
-def run_epoch(model, optimizer, data_loader, dataset_size, backward=True):
+def run_epoch(model, optimizer, data_loader, dataset_size, backward=True, prediction_callback=None):
     epoch_loss = 0.
     epoch_acc = 0.
     output_flattened = isinstance(model, (zoo.ONetBase, zoo.RNetBase))
@@ -66,6 +78,8 @@ def run_epoch(model, optimizer, data_loader, dataset_size, backward=True):
         image, gt_label, gt_bbox = sample["image"].to(dev), sample["label"].to(dev), sample["bbox"].to(dev)
 
         pred_bbox, pred_label = model(image)
+        if prediction_callback:
+            prediction_callback(i, pred_bbox, pred_label, gt_label, gt_bbox, image)
 
         if not output_flattened:
             # HACK zero loss for bbox in negative data
@@ -102,71 +116,60 @@ current_epoch = 0
 best_acc = 0.
 
 # INIT
+wandb.init(project="barcode-detection", config=vars(args))
 dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device", dev)
 
+# loading dataset
 train_dataset = MASDataset(directories=TRAIN_DATA_DIR, transform=transforms.ToTensor(), grayscale=args.grayscale, gradient=GRADIENT)
 val_dataset = MASDataset(directories=VAL_DATA_DIR, transform=transforms.ToTensor(), grayscale=args.grayscale, gradient=GRADIENT)
-
-train_dataset_len = len(train_dataset)
 
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
+# loading pretrained model
 model = models[args.model_type]()   # type: nn.Module
 if LOAD_MODEL_PATH:
     start_epoch, best_acc = model_util.load(model, data=torch.load(LOAD_MODEL_PATH))
 
+# init model and loss
 model = model.to(dev)
 optimizer = torch.optim.SGD(params=model.parameters(), lr=LR, weight_decay=0)
 cls_criterion = nn.CrossEntropyLoss()
 bbox_criterion = nn.MSELoss()
+predction_samples_holder = PredictionSampleHolder()
 
 # TRAINING
-try:
-    print("Start training...")
-    for e in range(1, EPOCHS_COUNT + 1):
-        model = model.train()
-        train_loss, train_acc = run_epoch(model, optimizer, train_loader, train_dataset_len, backward=True)
+print("Start training...")
+for e in range(1, EPOCHS_COUNT + 1):
+    model = model.train()
+    train_loss, train_acc = run_epoch(model, optimizer, train_loader, len(train_dataset), backward=True)
 
-        model = model.eval()
-        val_loss, val_acc = run_epoch(model, optimizer, val_loader, len(val_dataset), backward=False)
+    model = model.eval()
+    val_loss, val_acc = run_epoch(
+        model,
+        optimizer,
+        val_loader,
+        len(val_dataset),
+        backward=False,
+        prediction_callback=predction_samples_holder
+    )
 
-        # saving and printing
-        current_epoch = e
-        if val_acc > best_acc:
-            best_acc = val_acc
-            out_path = "{dir}/best_model.pth".format(dir=EXPERIMENTS_DIR)
-            model_util.save(model, epoch=current_epoch + start_epoch, best_acc=best_acc, out_path=out_path)
+    # saving and printing
+    print("Epoch: {} ({}): Train loss: {:.4f} Train acc: {:.4f} "
+          "Val Loss: {:.4f} Val acc: {:.4f}"
+          .format(start_epoch + e, e, train_loss, train_acc, val_loss, val_acc))
 
-        print("Epoch: {} ({}): Train loss: {:.4f} Train acc: {:.4f} "
-              "Val Loss: {:.4f} Val acc: {:.4f}"
-              .format(start_epoch + e, e, train_loss, train_acc, val_loss, val_acc))
-
-        writer = SummaryWriter(log_dir=LOG_DIR)
-        writer.add_scalars("Watching/Loss", {"train": train_loss}, e + start_epoch)
-        writer.add_scalars("Watching/Loss", {"val": val_loss}, e + start_epoch)
-        writer.add_scalars("Watching/Accuracy", {"train": train_acc}, e + start_epoch)
-        writer.add_scalars("Watching/Accuracy", {"val": val_acc}, e + start_epoch)
-        writer.flush()
-        writer.close()
-
-# SAVING MODEL
-except KeyboardInterrupt:
-    epoch = current_epoch + start_epoch
-
-    start_model = LOAD_MODEL_PATH if "model_exp" in LOAD_MODEL_PATH else None
-    models = tuple(filter(lambda x: "model_exp" in x, os.listdir(EXPERIMENTS_DIR)))
-    current_index = 1
-
-    if len(models):
-        current_index = max(map(lambda x: int(x
-                                .split("/")[-1]
-                                .replace(".pth", "")
-                                .split("_")[-1]), models)) + 1
-    out_path = "{dir}/model_exp_{index}.pth".format(dir=EXPERIMENTS_DIR, index=current_index)
-    if start_model:
-        out_path = "{dir}/{basename}_{index}.pth"\
-            .format(dir=EXPERIMENTS_DIR, basename=start_model.split("/")[-1].replace(".pth", ""), index=current_index)
-
-    model_util.save(model, epoch=epoch, best_acc=best_acc, out_path=out_path)
+    wandb.log({
+        "Training Loss": train_loss,
+        "Training Accuracy": train_acc,
+        "Validation Loss": val_loss,
+        "Validation Accuracy": val_acc,
+        "Examples": [
+            wandb.Image(img, caption="Pred: {1}({0:.2f}) GT: {2}".format(
+                *(F.softmax(pred_label.detach()).squeeze().max(dim=0)), gt_label))
+            for img, _, pred_label, _, gt_label in predction_samples_holder
+        ]
+    })
+# saving the end model
+torch.save(model.state_dict(), os.path.join(wandb.run.dir, "model.pt"))
