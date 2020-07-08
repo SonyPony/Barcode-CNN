@@ -19,4 +19,6 @@ class Logger:
 
         if val_acc >= self._best_acc:   # saving the best model
             torch.save(model.state_dict(), os.path.join(wandb.run.dir, "best_model.pt"))
+            wandb.run.summary["best_val_accuracy"] = val_acc
+            self._best_acc = val_acc
         torch.save(model.state_dict(), os.path.join(wandb.run.dir, "model.pt"))
