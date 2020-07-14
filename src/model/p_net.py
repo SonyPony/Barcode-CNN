@@ -69,29 +69,29 @@ class ExtPnetA3(PNetBase):
         self.features = nn.Sequential(OrderedDict([
             ("conv1", nn.Conv2d(in_channels=3, out_channels=10, kernel_size=3)),
             ("prelu1", nn.PReLU(num_parameters=10)),
-            #("bn1", nn.BatchNorm2d(num_features=10)),
+            ("bn1", nn.BatchNorm2d(num_features=10)),
 
             ("aconv1", nn.Conv2d(in_channels=10, out_channels=14, kernel_size=3, dilation=2)),
             ("aprelu1", nn.PReLU(num_parameters=14)),
-            #("bn2", nn.BatchNorm2d(num_features=14)),
+            ("bn2", nn.BatchNorm2d(num_features=14)),
 
             ("aconv2", nn.Conv2d(in_channels=14, out_channels=16, kernel_size=3, dilation=2)),
             ("aprelu2", nn.PReLU(num_parameters=16)),
-            #("bn3", nn.BatchNorm2d(num_features=16)),
+            ("bn3", nn.BatchNorm2d(num_features=16)),
 
             ("aconv3", nn.Conv2d(in_channels=16, out_channels=10, kernel_size=3, dilation=2)),
             ("aprelu3", nn.PReLU(num_parameters=10)),
-            #("bn4", nn.BatchNorm2d(num_features=10)),
+            ("bn4", nn.BatchNorm2d(num_features=10)),
 
             ("pool1", nn.MaxPool2d(kernel_size=2, stride=2)),
 
             ("conv2", nn.Conv2d(in_channels=10, out_channels=16, kernel_size=3)),
             ("prelu2", nn.PReLU(num_parameters=16)),
-            #("bn5", nn.BatchNorm2d(num_features=16)),
+            ("bn5", nn.BatchNorm2d(num_features=16)),
 
             ("conv3", nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3)),
             ("prelu3", nn.PReLU(num_parameters=32)),
-            #("bn6", nn.BatchNorm2d(num_features=32)),
+            ("bn6", nn.BatchNorm2d(num_features=32)),
             #("drop1", nn.Dropout2d(p=0.5))
         ]))
 
