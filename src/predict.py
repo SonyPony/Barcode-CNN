@@ -386,7 +386,10 @@ def run_pnet(model, img, scale, threshold=0.6):
 
 
 model = models[PNET_TYPE]()
-model.load_state_dict(torch.load(PNET_MODEL_PATH)["weights"])
+weights = torch.load(PNET_MODEL_PATH)
+if "weights" in weights.keys():
+    weights = weights["weights"]
+model.load_state_dict(weights)
 model.eval()
 model = model.to(dev)
 
